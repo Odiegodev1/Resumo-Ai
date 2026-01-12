@@ -10,22 +10,24 @@ export async function POST(req: Request) {
     }
 
     const billing = payload.data
-
     const userId = billing?.customer?.metadata?.userId
+    const billingId = billing?.id
 
-    if (!userId) {
+    if (!userId || !billingId) {
       return NextResponse.json(
-        { error: "userId não encontrado" },
+        { error: "Missing data" },
         { status: 400 }
       )
     }
 
-    // 🔥 ATUALIZA PLANO
+    await prisma.payment.update({
+      where: { providerChargeId: billingId },
+      data: { status: "PAID" },
+    })
+
     await prisma.user.update({
       where: { id: userId },
-      data: {
-        plan: "PRO",
-      },
+      data: { plan: "PRO" },
     })
 
     return NextResponse.json({ ok: true })

@@ -15,10 +15,33 @@ export async function createProPixPayment() {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      cpf: true,
+      plan: true,
+      cellphone: true,
+    },
   })
 
-  if (user?.plan === "PRO") {
+  if (!user) {
+    return { error: "USER_NOT_FOUND" }
+  }
+
+  if (user.plan === "PRO") {
     return { error: "ALREADY_PRO" }
+  }
+
+  // ⚠️ AbacatePay exige dados mínimos do cliente
+  const customer = {
+    name: user.name ?? "122",
+    email: user.email ?? "odiegodev10@gmail.com ",
+    taxId: user.cpf ?? "14028415748",
+    cellphone: user.cellphone ?? "22999650436",
+    metadata: {
+      userId: user.id, // 🔥 ESSENCIAL PARA O WEBHOOK
+    },
   }
 
   const response = await fetch(`${ABACATE_PAY_URL}/billing/create`, {
@@ -35,33 +58,27 @@ export async function createProPixPayment() {
           externalId: "plan-pro",
           name: "Plano PRO",
           description: "Acesso vitalício ao plano PRO",
-          price: 2990,
+          price: 2990, // centavos (R$29,90)
           quantity: 1,
         },
       ],
-
-      // 🔥 ISSO É O QUE ESTAVA FALTANDO
-      customer: {
-        metadata: {
-          userId: session.user.id,
-        },
-      },
-
+      customer, // ✅ agora está válido
       returnUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/confirmacao`,
       completionUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/confirmacao`,
     }),
   })
 
   if (!response.ok) {
+    const errorText = await response.text()
+    console.error("AbacatePay error:", errorText)
     return { error: "PAYMENT_FAILED" }
   }
 
   const billing = await response.json()
 
-  // 🔒 salva como PENDING
   await prisma.payment.create({
     data: {
-      userId: session.user.id,
+      userId: user.id,
       provider: "ABACATEPAY",
       providerChargeId: billing.data.id,
       amount: billing.data.amount,
