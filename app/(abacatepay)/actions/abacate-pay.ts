@@ -35,10 +35,18 @@ export async function createProPixPayment() {
           externalId: "plan-pro",
           name: "Plano PRO",
           description: "Acesso vitalício ao plano PRO",
-          price: 2990, // R$29,90 (em centavos)
+          price: 2990,
           quantity: 1,
         },
       ],
+
+      // 🔥 ISSO É O QUE ESTAVA FALTANDO
+      customer: {
+        metadata: {
+          userId: session.user.id,
+        },
+      },
+
       returnUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/confirmacao`,
       completionUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/confirmacao`,
     }),
@@ -62,6 +70,6 @@ export async function createProPixPayment() {
   })
 
   return {
-    url: billing.data.url, // 🔥 redireciona para o PIX
+    url: billing.data.url,
   }
 }

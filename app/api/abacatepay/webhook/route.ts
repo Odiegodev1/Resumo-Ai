@@ -1,29 +1,39 @@
-import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { NextResponse } from "next/server"
 
-export async function POST(req: NextRequest) {
-  const payload = await req.json()
+export async function POST(req: Request) {
+  try {
+    const payload = await req.json()
 
-  console.log("🔥 WEBHOOK RECEBIDO:", payload)
+    if (payload.event !== "billing.paid") {
+      return NextResponse.json({ ok: true })
+    }
 
-  const chargeId = payload?.data?.id
-  const status = payload?.data?.status
+    const billing = payload.data
 
-  if (!chargeId || !status) {
-    return NextResponse.json({ ok: false }, { status: 400 })
-  }
+    const userId = billing?.customer?.metadata?.userId
 
-  if (status === "PAID") {
-    const payment = await prisma.payment.update({
-      where: { providerChargeId: chargeId },
-      data: { status: "PAID" },
-    })
+    if (!userId) {
+      return NextResponse.json(
+        { error: "userId não encontrado" },
+        { status: 400 }
+      )
+    }
 
+    // 🔥 ATUALIZA PLANO
     await prisma.user.update({
-      where: { id: payment.userId },
-      data: { plan: "PRO" },
+      where: { id: userId },
+      data: {
+        plan: "PRO",
+      },
     })
-  }
 
-  return NextResponse.json({ ok: true })
+    return NextResponse.json({ ok: true })
+  } catch (error) {
+    console.error("Webhook error:", error)
+    return NextResponse.json(
+      { error: "Webhook failed" },
+      { status: 500 }
+    )
+  }
 }
